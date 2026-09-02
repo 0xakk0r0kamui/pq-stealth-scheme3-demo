@@ -1,0 +1,28 @@
+{
+  "name": "pq-stealth-scheme3-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "setup:local": "node scripts/use-local-package.mjs",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@kohaku-eth/plugins": "0.0.1-alpha.13",
+    "@kohaku-eth/pq-stealth-scheme3": "https://github.com/0xakk0r0kamui/kohaku-sapq/releases/download/pq-stealth-scheme3-v0.1.1/kohaku-eth-pq-stealth-scheme3-0.1.1.tgz",
+    "@kohaku-eth/provider": "0.1.0-alpha.9",
+    "viem": "^2.51.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vite": "^7.3.6",
+    "vitest": "^4.1.1"
+  },
+  "packageManager": "pnpm@10.28.0+sha512.05df71d1421f21399e053fde567cea34d446fa02c76571441bfc1c7956e98e363088982d940465fd34480d4d90a0668bc12362f8aa88000a64e83d0b0e47be48"
+}
