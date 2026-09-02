@@ -16,8 +16,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -34,16 +37,14 @@ jobs:
       - name: Build
         run: corepack pnpm build
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@v5
+
+      - id: upload
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
       - id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_id: ${{ steps.upload.outputs.artifact_id }}
