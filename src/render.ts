@@ -19,10 +19,6 @@ export function setText(selector: string, value: string): void {
   element(selector).textContent = value;
 }
 
-export function setEnabled(selector: string, enabled: boolean): void {
-  element<HTMLButtonElement>(selector).disabled = !enabled;
-}
-
 export function show(selector: string): void {
   element(selector).classList.remove('hidden');
 }
@@ -42,7 +38,13 @@ export function action(selector: string, run: () => Promise<string>): void {
   const button = element<HTMLButtonElement>(selector);
 
   button.addEventListener('click', async () => {
-    button.disabled = true;
+    if (button.getAttribute('aria-busy') === 'true') {
+      status('That action is already running', 'working');
+
+      return;
+    }
+
+    button.setAttribute('aria-busy', 'true');
     status('Working…', 'working');
 
     try {
@@ -50,7 +52,7 @@ export function action(selector: string, run: () => Promise<string>): void {
     } catch (error) {
       status(error instanceof Error ? error.message : String(error), 'error');
     } finally {
-      button.disabled = false;
+      button.removeAttribute('aria-busy');
     }
   });
 }
@@ -139,6 +141,7 @@ export function renderBobMetaAddress(session: WalletSession): void {
   element<HTMLInputElement>('#manual-spending-pk').value = meta.spendingPublicKey;
   element<HTMLInputElement>('#manual-viewing-pk').value = meta.viewingPublicKey;
   element<HTMLTextAreaElement>('#manual-ek').value = meta.encapsulationKey;
+  element<HTMLTextAreaElement>('#manual-meta-address').value = session.identity.metaAddress;
   setText('#keygen-index', session.identity.keygenIndex.toString());
   show('#bob-meta-result');
 }

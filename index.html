@@ -24,34 +24,58 @@
             Register, announce, fund, scan, and spend. Each transaction is checked
             against the values the plugin prepared.
           </p>
-          <p class="warning">Keys are shown on this page. Use test accounts.</p>
+          <p class="warning">Keys are shown on this page. Use test accounts. Payment secrets stay in memory and are cleared on refresh. A fresh random sender key is created for every page session.</p>
+          <ol class="flow">
+            <li>Connect to a chain</li>
+            <li>Create or load Bob and register his meta-address</li>
+            <li>Create or load Alice, then prepare, announce, and fund</li>
+            <li>Bob scans the configured block range and spends the note</li>
+          </ol>
+          <p class="muted">Buttons stay available so web and CLI participants can be mixed. If a prerequisite is missing, the action explains what to do next.</p>
           <div class="inline-form">
             <input id="rpc-url" aria-label="RPC URL" />
             <button id="connect">Connect</button>
           </div>
+          <details class="note deployment">
+            <summary>Deployment and scan range</summary>
+            <div class="form-grid">
+              <label>ERC-5564 announcer<input id="announcer-address" autocomplete="off" /></label>
+              <label>ERC-6538 registry<input id="registry-address" autocomplete="off" /></label>
+              <label>Scan start block<input id="scan-start-block" inputmode="numeric" placeholder="latest block + 1" /></label>
+            </div>
+            <p>For an existing Bob announcement, set the scan start block at or before that transaction. Leaving it blank starts after the latest block.</p>
+            <details>
+              <summary>Verify custom deployment bytecode</summary>
+              <div class="form-grid">
+                <label>Expected announcer keccak256<input id="announcer-hash" placeholder="optional 32-byte hash" autocomplete="off" /></label>
+                <label>Expected registry keccak256<input id="registry-hash" placeholder="optional 32-byte hash" autocomplete="off" /></label>
+              </div>
+              <p>Sepolia uses pinned hashes automatically. On other chains, provide hashes from a deployment you trust; otherwise the demo marks the contracts as unverified.</p>
+            </details>
+          </details>
           <dl id="network-result" class="chain-meta hidden">
             <div><dt>Chain ID</dt><dd><output id="chain-id"></output></dd></div>
             <div><dt>Latest block</dt><dd><output id="latest-block"></output></dd></div>
             <div>
               <dt>ERC-5564 announcer</dt>
               <dd>
-                <code>0x55649E01B5Df198D18D95b5cc5051630cfD45564</code>
                 <small id="announcer-code"></small>
               </dd>
             </div>
             <div>
               <dt>ERC-6538 registry</dt>
               <dd>
-                <code>0x6538E6bf4B0eBd30A8Ea093027Ac2422ce5d6538</code>
                 <small id="registry-code"></small>
               </dd>
             </div>
+            <div><dt>Scan start</dt><dd><output id="active-scan-start"></output></dd></div>
             <div><dt>Contracts</dt><dd><output id="contract-status"></output></dd></div>
           </dl>
         </div>
       </header>
 
       <main class="stage">
+
         <article class="pane alice">
           <header class="pane-head">
             <p class="role">Sender</p>
@@ -60,15 +84,16 @@
           </header>
 
           <div class="block">
-            <p class="muted">BIP-39 mnemonic for the Kohaku host. Keygen and sender keys are 32 bytes.</p>
+            <h3>1. Alice’s keys</h3>
+            <p class="muted">The mnemonic restores Alice’s keygen identity. This demo also creates a fresh 32-byte sender key for the current page session.</p>
             <label>Mnemonic</label>
             <div class="with-copy">
               <textarea id="alice-mnemonic" class="raw" placeholder="24 words" autocomplete="off" spellcheck="false"></textarea>
               <button data-copy="#alice-mnemonic">Copy</button>
             </div>
             <div class="button-row">
-              <button id="generate-alice" disabled>Generate mnemonic</button>
-              <button id="load-alice" disabled>Use mnemonic</button>
+              <button id="load-alice">Use mnemonic</button>
+              <button id="generate-alice">Generate mnemonic</button>
             </div>
             <div id="alice-result" class="stack hidden">
               <label>Address</label>
@@ -77,25 +102,24 @@
                 <button data-copy="#alice-address">Copy</button>
               </div>
               <div class="inline-form compact">
-                <button id="balance-alice" disabled>Balance</button>
+                <button id="balance-alice">Balance</button>
                 <output id="alice-balance">—</output>
               </div>
-              <label>Keygen · 32 bytes</label>
+              <label>Keygen master · 32 bytes</label>
               <div class="with-copy">
-                <textarea id="alice-identity-seed" class="raw" spellcheck="false"></textarea>
+                <textarea id="alice-identity-seed" class="raw" readonly spellcheck="false"></textarea>
                 <button data-copy="#alice-identity-seed">Copy</button>
               </div>
-              <label>Sender · 32 bytes</label>
+              <label>Sender · 32 random bytes for this page session</label>
               <div class="with-copy">
-                <textarea id="alice-sender-seed" class="raw" spellcheck="false"></textarea>
+                <textarea id="alice-sender-seed" class="raw" readonly spellcheck="false"></textarea>
                 <button data-copy="#alice-sender-seed">Copy</button>
               </div>
-              <button id="use-alice-seeds" disabled>Use keys</button>
             </div>
           </div>
 
           <div class="block">
-            <h3>Announce and fund</h3>
+            <h3>2. Announce and fund</h3>
             <p class="muted">Derive a stealth address for Bob, announce it, then fund it.</p>
             <div class="manual-editor">
               <h3>Recipient</h3>
@@ -106,21 +130,24 @@
                   <option value="manual">Stealth meta-address</option>
                 </select>
               </label>
+              <label>Registry account
+                <input id="registry-recipient" placeholder="Bob’s 0x address from the web or CLI" autocomplete="off" />
+              </label>
               <div id="manual-meta" class="stack hidden">
-                <label>Spending public key · 33 bytes<input id="manual-spending-pk" /></label>
-                <label>Viewing public key · 33 bytes<input id="manual-viewing-pk" /></label>
-                <label>Encapsulation key · 1184 bytes<textarea id="manual-ek" class="raw"></textarea></label>
+                <label>Stealth meta-address · 1250 bytes<textarea id="manual-meta-address" class="raw" placeholder="Paste the complete value printed by the CLI"></textarea></label>
+                <details class="note">
+                  <summary>Enter separate key components</summary>
+                  <label>Spending public key · 33 bytes<input id="manual-spending-pk" /></label>
+                  <label>Viewing public key · 33 bytes<input id="manual-viewing-pk" /></label>
+                  <label>Encapsulation key · 1184 bytes<textarea id="manual-ek" class="raw"></textarea></label>
+                </details>
                 <output id="manual-meta-status"></output>
               </div>
             </div>
             <div class="form-grid">
               <label>Amount (ETH)<input id="payment-amount" value="0.005" /></label>
             </div>
-            <div class="button-row">
-              <button id="prepare-payment" disabled>Prepare</button>
-              <button id="announce" disabled>Announce</button>
-              <button id="fund" disabled>Fund</button>
-            </div>
+            <button id="prepare-payment">Prepare</button>
             <div id="payment-result" class="kv hidden">
               <div><span>Recipient</span><output id="prepared-recipient"></output></div>
               <div><span>Stealth address</span><code id="prepared-stealth-address"></code></div>
@@ -128,9 +155,11 @@
               <div><span>View tag · 1 byte</span><code id="prepared-view-tag"></code></div>
               <div><span>Ciphertext · 1088 bytes</span><small id="prepared-ct"></small></div>
             </div>
+            <button id="announce">Announce</button>
+            <button id="fund">Fund</button>
           </div>
         </article>
-
+        
         <article class="pane bob">
           <header class="pane-head">
             <p class="role">Recipient</p>
@@ -139,15 +168,16 @@
           </header>
 
           <div class="block">
-            <p class="muted">BIP-39 mnemonic for the Kohaku host. Keygen and sender keys are 32 bytes.</p>
+            <h3>1. Bob’s keys</h3>
+            <p class="muted">The mnemonic restores Bob’s keygen identity. This demo also creates a fresh 32-byte sender key for the current page session.</p>
             <label>Mnemonic</label>
             <div class="with-copy">
               <textarea id="bob-mnemonic" class="raw" placeholder="24 words" autocomplete="off" spellcheck="false"></textarea>
               <button data-copy="#bob-mnemonic">Copy</button>
             </div>
             <div class="button-row">
-              <button id="generate-bob" disabled>Generate mnemonic</button>
-              <button id="load-bob" disabled>Use mnemonic</button>
+              <button id="load-bob">Use mnemonic</button>
+              <button id="generate-bob">Generate mnemonic</button>
             </div>
             <div id="bob-result" class="stack hidden">
               <label>Address</label>
@@ -156,29 +186,29 @@
                 <button data-copy="#bob-address">Copy</button>
               </div>
               <div class="inline-form compact">
-                <button id="balance-bob" disabled>Balance</button>
+                <button id="balance-bob">Balance</button>
                 <output id="bob-balance">—</output>
               </div>
-              <label>Keygen · 32 bytes</label>
+              <label>Keygen master · 32 bytes</label>
               <div class="with-copy">
-                <textarea id="bob-identity-seed" class="raw" spellcheck="false"></textarea>
+                <textarea id="bob-identity-seed" class="raw" readonly spellcheck="false"></textarea>
                 <button data-copy="#bob-identity-seed">Copy</button>
               </div>
-              <label>Sender · 32 bytes</label>
+              <label>Sender · 32 random bytes for this page session</label>
               <div class="with-copy">
-                <textarea id="bob-sender-seed" class="raw" spellcheck="false"></textarea>
+                <textarea id="bob-sender-seed" class="raw" readonly spellcheck="false"></textarea>
                 <button data-copy="#bob-sender-seed">Copy</button>
               </div>
-              <button id="use-bob-seeds" disabled>Use keys</button>
             </div>
           </div>
 
           <div class="block">
-            <h3>Stealth meta-address</h3>
+            <h3>2. Bob’s stealth meta-address</h3>
             <p class="muted">Senders use this to derive stealth addresses.</p>
             <details class="note">
               <summary>Keygen</summary>
-              <p>The host keygen key (32 bytes) is expanded to a 128-byte keygen seed:</p>
+              <p>The host derives a 32-byte keygen master at <code>m/5564'/60'/0'/0'</code>. Scheme 3 applies its domain-separated KDF with scheme ID, scheme name, and keygen index to produce 128 bytes:</p>
+              <code>keygen_seed(master, scheme_id = 3, scheme_name, index, 128)</code>
               <code>keygen_seed = spending_seed (32) ‖ viewing_seed (32) ‖ kem_seed (64)</code>
               <p>Keygen outputs the spending public key, viewing public key, and ML-KEM-768 encapsulation key.</p>
             </details>
@@ -197,22 +227,13 @@
               <div class="with-copy"><textarea id="bob-meta-address" class="raw" readonly></textarea><button data-copy="#bob-meta-address">Copy</button></div>
               <div><label>Keygen index</label><output id="keygen-index"></output></div>
             </div>
+            <button id="register">Register</button>
           </div>
 
           <div class="block">
-            <h3>Register</h3>
-            <p class="muted">ERC-6538 stores the stealth meta-address under Bob’s account, scheme id 3.</p>
-            <details class="note">
-              <summary>registerKeys</summary>
-              <code>registry.registerKeys(3, meta)</code>
-            </details>
-            <button id="register" disabled>Register</button>
-          </div>
-
-          <div class="block">
-            <h3>Scan</h3>
-            <p class="muted">Parse ERC-5564 announcements for this viewing key.</p>
-            <button id="scan" disabled>Scan</button>
+            <h3>3. Scan</h3>
+            <p class="muted">Parse ERC-5564 announcements for this viewing key. This also finds payments created by the CLI.</p>
+            <button id="scan">Scan</button>
             <div id="note-result" class="kv hidden">
               <div><span>Stealth address</span><code id="note-address"></code></div>
               <div><span>Balance</span><output id="note-amount"></output></div>
@@ -221,23 +242,23 @@
           </div>
 
           <div class="block">
-            <h3>Spend</h3>
+            <h3>4. Spend</h3>
             <p class="muted">Compute the stealth private key, sign, and broadcast.</p>
             <div class="form-grid">
               <label>To<input id="spend-recipient" /></label>
               <label>Amount (ETH)<input id="spend-amount" value="0.001" /></label>
             </div>
-            <div class="button-row">
-              <button id="prepare-spend" disabled>Sign</button>
-              <button id="broadcast-spend" disabled>Broadcast</button>
-            </div>
+            <button id="prepare-spend">Sign</button>
             <div id="spend-result" class="kv hidden">
               <div><span>Stealth address</span><code id="spend-signer"></code></div>
               <div><span>Transaction hash</span><code id="spend-hash"></code></div>
               <div><span>Gas limit</span><output id="spend-gas"></output></div>
             </div>
+            <button id="broadcast-spend">Broadcast</button>
           </div>
         </article>
+
+        
       </main>
 
       <section class="log">

@@ -11,19 +11,18 @@ import {
   hide,
   renderBobMetaAddress,
   renderParticipant,
-  setEnabled,
   setText,
   show,
   type ParticipantRole,
 } from './render.js';
 import { WalletSession } from './session.js';
 import type { ChainConnection } from './chain.js';
+import { parseBytes } from './seed-keystore.js';
 
 export class DemoController {
   private connection?: ChainConnection;
   private alice?: WalletSession;
   private bob?: WalletSession;
-  private bobRegistered = false;
 
   constructor() {
     this.setupParticipant('alice');
@@ -40,16 +39,10 @@ export class DemoController {
     this.connection = connection;
     this.alice = undefined;
     this.bob = undefined;
-    this.bobRegistered = false;
     this.resetPayment();
     hide('#bob-meta-result');
-    setEnabled('#register', false);
 
     for (const role of ['alice', 'bob'] as const) {
-      setEnabled(`#generate-${role}`, true);
-      setEnabled(`#load-${role}`, true);
-      setEnabled(`#use-${role}-seeds`, false);
-      setEnabled(`#balance-${role}`, false);
       hide(`#${role}-result`);
     }
   }
@@ -62,11 +55,6 @@ export class DemoController {
     return participant;
   }
 
-  registerBob(): void {
-    this.bobRegistered = true;
-    this.updatePaymentAction();
-  }
-
   payment(): PreparedPayment {
     const payment = this.participant('alice').payment;
 
@@ -76,17 +64,18 @@ export class DemoController {
   }
 
   manualMetaAddress(): Hex {
-    const metaAddress = encodeMetaAddress({
-      spendingPublicKey: readHex('#manual-spending-pk', 'spending_pk'),
-      viewingPublicKey: readHex('#manual-viewing-pk', 'viewing_pk_ec'),
-      encapsulationKey: readHex('#manual-ek', 'ek'),
-    });
+    const complete = element<HTMLTextAreaElement>('#manual-meta-address').value.trim();
+    const metaAddress = complete
+      ? parseBytes(complete, 1250, 'stealth meta-address')
+      : encodeMetaAddress({
+        spendingPublicKey: readHex('#manual-spending-pk', 'spending_pk'),
+        viewingPublicKey: readHex('#manual-viewing-pk', 'viewing_pk_ec'),
+        encapsulationKey: readHex('#manual-ek', 'ek'),
+      });
     const matchesBob = this.bob?.identity.metaAddress.toLowerCase()
       === metaAddress.toLowerCase();
 
-    setText('#manual-meta-status', matchesBob
-      ? 'Matches Bob'
-      : 'Does not match Bob');
+    setText('#manual-meta-status', matchesBob ? 'Matches web Bob' : 'Using pasted meta-address');
 
     return metaAddress;
   }
@@ -112,23 +101,6 @@ export class DemoController {
       return `Loaded ${participantName(role)}’s mnemonic`;
     });
 
-    action(`#use-${role}-seeds`, async () => {
-      const mnemonic = element<HTMLTextAreaElement>(`#${role}-mnemonic`).value.trim();
-
-      if (!mnemonic) throw new Error(`Enter ${participantName(role)}’s mnemonic`);
-
-      const session = await WalletSession.fromSeeds(
-        this.requireConnection(),
-        mnemonic,
-        element<HTMLTextAreaElement>(`#${role}-identity-seed`).value,
-        element<HTMLTextAreaElement>(`#${role}-sender-seed`).value,
-      );
-
-      this.setParticipant(role, session);
-
-      return `Loaded ${participantName(role)}’s keygen and sender keys`;
-    });
-
     action(`#balance-${role}`, async () => {
       const session = this.participant(role);
       const amount = `${formatEther(await session.balance())} ETH`;
@@ -147,33 +119,14 @@ export class DemoController {
       element<HTMLInputElement>('#spend-recipient').value = session.account.address;
     } else {
       this.bob = session;
-      this.bobRegistered = false;
       renderBobMetaAddress(session);
-      setEnabled('#register', true);
+      element<HTMLInputElement>('#registry-recipient').value = session.account.address;
     }
 
     renderParticipant(role, session);
-    setEnabled(`#balance-${role}`, true);
-    setEnabled(`#use-${role}-seeds`, true);
-    this.updatePaymentAction();
-  }
-
-  private updatePaymentAction(): void {
-    setEnabled('#prepare-payment', Boolean(this.alice && this.bob && this.bobRegistered));
   }
 
   private resetPayment(): void {
-    for (const selector of [
-      '#prepare-payment',
-      '#announce',
-      '#fund',
-      '#scan',
-      '#prepare-spend',
-      '#broadcast-spend',
-    ]) {
-      setEnabled(selector, false);
-    }
-
     hide('#payment-result');
     hide('#note-result');
     hide('#spend-result');
@@ -181,6 +134,9 @@ export class DemoController {
 
   private requireConnection(): ChainConnection {
     if (!this.connection) throw new Error('Connect to an RPC first');
+    if (!this.connection.contractsReady) {
+      throw new Error('Configure usable announcer and registry contracts first');
+    }
 
     return this.connection;
   }
